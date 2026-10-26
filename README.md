@@ -8,7 +8,9 @@ GitHub Trending（今日・今週・今月 × 全体＋主要 19 言語 = 60 ペ
 - `scripts/collect.ts` … Trending ページを取得・重複排除・分類し、`data/` に JSON を保存
   - `data/snapshots/YYYY-MM-DD.json` … その日の全リポジトリ
   - `data/index.json` … 日ごとのカテゴリ比率と上位リスト（推移グラフ用）
-- `shared/categories.ts` … カテゴリ定義（正規表現）。ここを編集すれば分類を調整できます
+- `shared/categories.ts` … カテゴリ定義（正規表現、重複あり）。トレンドの切り口
+- `shared/genres.ts` … ジャンル定義（正規表現、重複なし）。上から順に判定し、最初に一致したものに割り当て
+  - どちらかを編集したら `npm run reclassify` で保存済みの全スナップショットを再分類できます
 - `scripts/config.ts` … 対象言語・並列数・リトライ・スコア計算などの設定
 - `site/` … Vite + Chart.js のダッシュボード。`data/` をそのまま静的ファイルとして配信
 - `.github/workflows/trending.yml` … 毎日 09:00 JST に収集 → `data/` を commit → Pages にデプロイ

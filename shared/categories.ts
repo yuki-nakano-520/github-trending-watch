@@ -1,10 +1,9 @@
+/** Shared by the "AI 全般" category and the "AI / エージェント" genre so both agree. */
+export const AI_PATTERN =
+  /\bai\b|llm|agent|gpt|claude|codex|cursor|\bmcp\b|neural|machine learning|deep learning|diffusion|\brag\b|prompt|copilot|inference|\bml\b|language model|大模型/i;
+
 export const CATEGORIES = [
-  {
-    id: 'ai',
-    label: 'AI 全般',
-    pattern:
-      /\bai\b|llm|agent|gpt|claude|codex|cursor|\bmcp\b|neural|machine learning|deep learning|diffusion|\brag\b|prompt|copilot|inference|\bml\b|language model|大模型/i,
-  },
+  { id: 'ai', label: 'AI 全般', pattern: AI_PATTERN },
   {
     id: 'codingAgent',
     label: 'コーディングエージェント周辺',

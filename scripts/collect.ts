@@ -1,11 +1,10 @@
 import * as cheerio from 'cheerio';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { setTimeout as sleep } from 'node:timers/promises';
-import { CATEGORY_IDS, classify, type CategoryId } from '../shared/categories.ts';
-import type { DaySummary, IndexFile, Period, Repo, Snapshot } from '../shared/types.ts';
+import type { Period, Repo, Snapshot } from '../shared/types.ts';
+import { classifyRepo, readIndex, summarize, writeIndex, type UnclassifiedRepo } from './analysis.ts';
 import {
   CONCURRENCY,
-  INDEX_FILE,
   LANGUAGES,
   MAX_ATTEMPTS,
   MAX_FAILURE_RATIO,
@@ -89,24 +88,8 @@ const scoreOf = (gains: Record<Period, number>): number => {
   return period ? gains[period] * SCORE_MULTIPLIERS[period] : 0;
 };
 
-const ratioByCategory = (repos: readonly Repo[]): Record<CategoryId, number> =>
-  Object.fromEntries(
-    CATEGORY_IDS.map((id) => [
-      id,
-      repos.length === 0 ? 0 : repos.filter((r) => r.categories.includes(id)).length / repos.length,
-    ]),
-  ) as Record<CategoryId, number>;
-
 const todayIn = (timeZone: string): string =>
   new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
-
-const readIndex = async (): Promise<IndexFile | null> => {
-  try {
-    return JSON.parse(await readFile(INDEX_FILE, 'utf8')) as IndexFile;
-  } catch {
-    return null;
-  }
-};
 
 const main = async (): Promise<void> => {
   const jobs: PageJob[] = PERIODS.flatMap((period) =>
@@ -132,7 +115,7 @@ const main = async (): Promise<void> => {
     throw new Error(`${failed.length}/${jobs.length} pages failed; not writing data`);
   }
 
-  const byName = new Map<string, Omit<Repo, 'categories' | 'score'>>();
+  const byName = new Map<string, Omit<UnclassifiedRepo, 'score'>>();
   for (const { job, rows } of pages) {
     for (const row of rows) {
       const repo = byName.get(row.name) ?? {
@@ -153,7 +136,7 @@ const main = async (): Promise<void> => {
   }
 
   const repos: Repo[] = [...byName.values()]
-    .map((r) => ({ ...r, categories: classify(`${r.name} ${r.description}`), score: scoreOf(r.gains) }))
+    .map((r) => classifyRepo({ ...r, score: scoreOf(r.gains) }))
     .sort((a, b) => b.score - a.score);
 
   const date = todayIn(TIME_ZONE);
@@ -164,26 +147,9 @@ const main = async (): Promise<void> => {
     repos,
   };
 
-  const top = repos.slice(0, TOP_N);
-  const summary: DaySummary = {
-    date,
-    repoCount: repos.length,
-    categoryRatio: { all: ratioByCategory(repos), top: ratioByCategory(top) },
-    top: top.map((r) => r.name),
-  };
-
-  const previous = await readIndex();
-  const index: IndexFile = {
-    updatedAt: snapshot.collectedAt,
-    topN: TOP_N,
-    days: [...(previous?.days ?? []).filter((d) => d.date !== date), summary].sort((a, b) =>
-      a.date.localeCompare(b.date),
-    ),
-  };
-
   await mkdir(SNAPSHOT_DIR, { recursive: true });
   await writeFile(new URL(`${date}.json`, SNAPSHOT_DIR), `${JSON.stringify(snapshot)}\n`);
-  await writeFile(INDEX_FILE, `${JSON.stringify(index, null, 2)}\n`);
+  await writeIndex(await readIndex(), [summarize(date, repos, TOP_N)], snapshot.collectedAt, TOP_N);
 
   console.log(`${date}: ${repos.length} repos from ${jobs.length - failed.length}/${jobs.length} pages`);
 };

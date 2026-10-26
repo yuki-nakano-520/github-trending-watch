@@ -15,6 +15,9 @@
   --series-6: #0c8599;
   --series-7: #c2255c;
   --series-8: #5c6b7a;
+  --series-9: #7048e8;
+  --series-10: #66a80f;
+  --series-11: #a0522d;
   color-scheme: light;
 }
 
@@ -36,6 +39,9 @@
     --series-6: #4fc3d4;
     --series-7: #f06595;
     --series-8: #9aa7b4;
+    --series-9: #9775fa;
+    --series-10: #94d82d;
+    --series-11: #d4a373;
     color-scheme: dark;
   }
 }
@@ -172,6 +178,15 @@ input[type='search'] {
 
 .chart-box.donut {
   height: 240px;
+}
+
+.chart-box.genre-donut {
+  height: 340px;
+}
+
+.chip.genre {
+  background: transparent;
+  border: 1px solid var(--accent);
 }
 
 .donuts {

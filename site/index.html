@@ -36,10 +36,36 @@
       </section>
 
       <section class="card">
+        <h2>ジャンル構成（選択日）</h2>
+        <p class="muted small">各リポジトリを 1 つのジャンルだけに割り当てています（重複なし、合計 100%）。</p>
+        <div class="donuts">
+          <figure>
+            <div class="chart-box genre-donut"><canvas id="genre-top-chart"></canvas></div>
+            <figcaption id="genre-top-caption"></figcaption>
+          </figure>
+          <figure>
+            <div class="chart-box genre-donut"><canvas id="genre-all-chart"></canvas></div>
+            <figcaption id="genre-all-caption"></figcaption>
+          </figure>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-head">
+          <h2>ジャンル構成の推移</h2>
+          <div class="segmented" role="group" aria-label="対象" data-chart="genre-trend">
+            <button type="button" data-scope="top" class="active">上位 <span class="top-n"></span> 件</button>
+            <button type="button" data-scope="all">全件</button>
+          </div>
+        </div>
+        <div class="chart-box"><canvas id="genre-trend-chart"></canvas></div>
+      </section>
+
+      <section class="card">
         <div class="card-head">
           <h2>カテゴリ比率の推移</h2>
-          <div class="segmented" role="group" aria-label="対象">
-            <button type="button" data-scope="top" class="active">上位 <span id="top-n"></span> 件</button>
+          <div class="segmented" role="group" aria-label="対象" data-chart="trend">
+            <button type="button" data-scope="top" class="active">上位 <span class="top-n"></span> 件</button>
             <button type="button" data-scope="all">全件</button>
           </div>
         </div>
@@ -64,6 +90,7 @@
           <h2>ランキング</h2>
           <div class="filters">
             <input id="search" type="search" placeholder="名前・説明で検索" />
+            <select id="genre-filter"></select>
             <select id="category-filter"></select>
             <label class="check"><input id="new-only" type="checkbox" /> 新顔のみ</label>
           </div>

@@ -1,5 +1,6 @@
 import { Chart, registerables } from 'chart.js';
 import { CATEGORIES, CATEGORY_IDS, type CategoryId } from '../shared/categories.ts';
+import { GENRE_IDS, GENRE_LABELS, OTHER_GENRE, type GenreId } from '../shared/genres.ts';
 import type { DaySummary, IndexFile, Repo, Snapshot } from '../shared/types.ts';
 
 Chart.register(...registerables);
@@ -9,7 +10,11 @@ type Scope = 'top' | 'all';
 const DEFAULT_VISIBLE_SERIES: readonly CategoryId[] = ['ai', 'codingAgent', 'local', 'alternative', 'security'];
 const MIN_REPOS_PER_LANGUAGE = 8;
 const SERIES_COLOR_COUNT = 8;
-const ALL_CATEGORIES = '';
+/** Neutral color reserved for "AI 以外" / "全件" / "その他". */
+const NEUTRAL_SERIES = '--series-8';
+/** Distinct colors for genres; the neutral one is left for "その他". */
+const GENRE_SERIES = ['1', '2', '3', '4', '5', '6', '7', '9', '10', '11'].map((n) => `--series-${n}`);
+const ALL = '';
 
 const el = <T extends HTMLElement>(selector: string): T => {
   const found = document.querySelector<T>(selector);
@@ -25,9 +30,12 @@ const fetchJson = async <T>(path: string): Promise<T> => {
 
 const cssVar = (name: string): string => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 const seriesColor = (i: number): string => cssVar(`--series-${(i % SERIES_COLOR_COUNT) + 1}`);
+const neutralColor = (): string => cssVar(NEUTRAL_SERIES);
+const genreColor = (id: GenreId): string =>
+  id === OTHER_GENRE.id ? neutralColor() : cssVar(GENRE_SERIES[GENRE_IDS.indexOf(id) % GENRE_SERIES.length] ?? NEUTRAL_SERIES);
 const number = new Intl.NumberFormat('ja-JP');
 const percent = (v: number): string => `${(v * 100).toFixed(1)}%`;
-const labelOf = (id: CategoryId): string => CATEGORIES.find((c) => c.id === id)?.label ?? id;
+const categoryLabel = (id: CategoryId): string => CATEGORIES.find((c) => c.id === id)?.label ?? id;
 
 const escapeHtml = (s: string): string =>
   s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] ?? c);
@@ -52,34 +60,66 @@ const streakOf = (days: readonly DaySummary[], dayIndex: number, name: string): 
   return streak;
 };
 
+const pointRadius = (index: IndexFile): number => (index.days.length > 60 ? 0 : 3);
+
 const renderTrend = (index: IndexFile, scope: Scope): void => {
-  const canvas = el<HTMLCanvasElement>('#trend-chart');
   replaceChart(
     'trend',
     () =>
-      new Chart(canvas, {
-      type: 'line',
-      data: {
-        labels: index.days.map((d) => d.date),
-        datasets: CATEGORY_IDS.map((id, i) => ({
-          label: labelOf(id),
-          data: index.days.map((d) => d.categoryRatio[scope][id] * 100),
-          borderColor: seriesColor(i),
-          backgroundColor: seriesColor(i),
-          pointRadius: index.days.length > 60 ? 0 : 3,
-          tension: 0.25,
-          hidden: !DEFAULT_VISIBLE_SERIES.includes(id),
-        })),
-      },
-      options: {
-        maintainAspectRatio: false,
-        interaction: { mode: 'index', intersect: false },
-        scales: { y: { min: 0, grace: '10%', ticks: { callback: (v) => `${v}%` } } },
-        plugins: {
-          tooltip: { callbacks: { label: (ctx) => `${ctx.dataset.label}: ${Number(ctx.parsed.y).toFixed(1)}%` } },
+      new Chart(el<HTMLCanvasElement>('#trend-chart'), {
+        type: 'line',
+        data: {
+          labels: index.days.map((d) => d.date),
+          datasets: CATEGORY_IDS.map((id, i) => ({
+            label: categoryLabel(id),
+            data: index.days.map((d) => d.categoryRatio[scope][id] * 100),
+            borderColor: seriesColor(i),
+            backgroundColor: seriesColor(i),
+            pointRadius: pointRadius(index),
+            tension: 0.25,
+            hidden: !DEFAULT_VISIBLE_SERIES.includes(id),
+          })),
         },
-      },
-    }),
+        options: {
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          scales: { y: { min: 0, grace: '10%', ticks: { callback: (v) => `${v}%` } } },
+          plugins: {
+            tooltip: { callbacks: { label: (ctx) => `${ctx.dataset.label}: ${Number(ctx.parsed.y).toFixed(1)}%` } },
+          },
+        },
+      }),
+  );
+};
+
+const renderGenreTrend = (index: IndexFile, scope: Scope): void => {
+  replaceChart(
+    'genre-trend',
+    () =>
+      new Chart(el<HTMLCanvasElement>('#genre-trend-chart'), {
+        type: 'line',
+        data: {
+          labels: index.days.map((d) => d.date),
+          datasets: GENRE_IDS.map((id, i) => ({
+            label: GENRE_LABELS[id],
+            data: index.days.map((d) => d.genreRatio[scope][id] * 100),
+            borderColor: genreColor(id),
+            backgroundColor: genreColor(id),
+            pointRadius: pointRadius(index),
+            tension: 0.25,
+            // Stack each band on top of the previous one.
+            fill: i === 0 ? 'origin' : '-1',
+          })),
+        },
+        options: {
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          scales: { y: { stacked: true, min: 0, max: 100, ticks: { callback: (v) => `${v}%` } } },
+          plugins: {
+            tooltip: { callbacks: { label: (ctx) => `${ctx.dataset.label}: ${Number(ctx.raw).toFixed(1)}%` } },
+          },
+        },
+      }),
   );
 };
 
@@ -102,70 +142,118 @@ const renderCategoryChart = (day: DaySummary): void => {
     'category',
     () =>
       new Chart(el<HTMLCanvasElement>('#category-chart'), {
-      type: 'bar',
-      data: {
-        labels: CATEGORY_IDS.map(labelOf),
-        datasets: [
-          {
-            label: `上位 ${day.top.length} 件`,
-            data: CATEGORY_IDS.map((id) => day.categoryRatio.top[id] * 100),
-            backgroundColor: seriesColor(0),
+        type: 'bar',
+        data: {
+          labels: CATEGORY_IDS.map(categoryLabel),
+          datasets: [
+            {
+              label: `上位 ${day.top.length} 件`,
+              data: CATEGORY_IDS.map((id) => day.categoryRatio.top[id] * 100),
+              backgroundColor: seriesColor(0),
+            },
+            {
+              label: '全件',
+              data: CATEGORY_IDS.map((id) => day.categoryRatio.all[id] * 100),
+              backgroundColor: neutralColor(),
+            },
+          ],
+        },
+        options: {
+          indexAxis: 'y',
+          maintainAspectRatio: false,
+          scales: { x: { min: 0, ticks: { callback: (v) => `${v}%` } } },
+          plugins: {
+            tooltip: { callbacks: { label: (ctx) => `${ctx.dataset.label}: ${Number(ctx.parsed.x).toFixed(1)}%` } },
           },
-          {
-            label: '全件',
-            data: CATEGORY_IDS.map((id) => day.categoryRatio.all[id] * 100),
-            backgroundColor: seriesColor(7),
-          },
-        ],
-      },
-      options: {
-        indexAxis: 'y',
-        maintainAspectRatio: false,
-        scales: { x: { min: 0, ticks: { callback: (v) => `${v}%` } } },
-        plugins: { tooltip: { callbacks: { label: (ctx) => `${ctx.dataset.label}: ${Number(ctx.parsed.x).toFixed(1)}%` } } },
-      },
-    }),
+        },
+      }),
   );
 };
 
-const renderAiDonuts = (day: DaySummary): void => {
-  const targets = [
-    { key: 'ai-top', label: `上位 ${day.top.length} 件`, ratio: day.categoryRatio.top.ai, total: day.top.length },
-    { key: 'ai-all', label: '全件', ratio: day.categoryRatio.all.ai, total: day.repoCount },
-  ];
-  for (const { key, label, ratio, total } of targets) {
-    replaceChart(
-      key,
-      () =>
-        new Chart(el<HTMLCanvasElement>(`#${key}-chart`), {
-          type: 'doughnut',
-          data: {
-            labels: ['AI', '非AI'],
-            datasets: [
-              {
-                data: [ratio * 100, (1 - ratio) * 100],
-                backgroundColor: [seriesColor(0), seriesColor(7)],
-                borderColor: cssVar('--surface'),
-                borderWidth: 2,
+interface DonutSlice {
+  label: string;
+  ratio: number;
+  color: string;
+}
+
+const renderDonut = (key: string, slices: readonly DonutSlice[], total: number): void => {
+  replaceChart(
+    key,
+    () =>
+      new Chart(el<HTMLCanvasElement>(`#${key}-chart`), {
+        type: 'doughnut',
+        data: {
+          labels: slices.map((s) => s.label),
+          datasets: [
+            {
+              data: slices.map((s) => s.ratio * 100),
+              backgroundColor: slices.map((s) => s.color),
+              borderColor: cssVar('--surface'),
+              borderWidth: 2,
+            },
+          ],
+        },
+        options: {
+          maintainAspectRatio: false,
+          cutout: '60%',
+          plugins: {
+            legend: { position: 'bottom', labels: { boxWidth: 12 } },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => {
+                  const ratio = Number(ctx.parsed) / 100;
+                  return `${ctx.label}: ${number.format(Math.round(ratio * total))} 件（${percent(ratio)}）`;
+                },
               },
-            ],
-          },
-          options: {
-            maintainAspectRatio: false,
-            cutout: '60%',
-            plugins: {
-              legend: { position: 'bottom' },
-              tooltip: { callbacks: { label: (ctx) => `${ctx.label}: ${Number(ctx.parsed).toFixed(1)}%` } },
             },
           },
-        }),
+        },
+      }),
+  );
+};
+
+const scopesOf = (day: DaySummary) =>
+  [
+    { scope: 'top', label: `上位 ${day.top.length} 件`, total: day.top.length },
+    { scope: 'all', label: '全件', total: day.repoCount },
+  ] as const;
+
+const renderAiDonuts = (day: DaySummary): void => {
+  for (const { scope, label, total } of scopesOf(day)) {
+    const key = `ai-${scope}`;
+    const ratio = day.categoryRatio[scope].ai;
+    renderDonut(
+      key,
+      [
+        { label: 'AI', ratio, color: seriesColor(0) },
+        { label: '非AI', ratio: 1 - ratio, color: neutralColor() },
+      ],
+      total,
     );
     el(`#${key}-caption`).textContent =
       `${label}: AI ${number.format(Math.round(ratio * total))} / ${number.format(total)} 件（${percent(ratio)}）`;
   }
 };
 
-const renderLanguageChart =(repos: readonly Repo[]): void => {
+const renderGenreDonuts = (day: DaySummary): void => {
+  for (const { scope, label, total } of scopesOf(day)) {
+    const key = `genre-${scope}`;
+    const ratios = day.genreRatio[scope];
+    // Largest first, with "その他" always last.
+    const ids = GENRE_IDS.filter((id) => id !== OTHER_GENRE.id && ratios[id] > 0).sort((a, b) => ratios[b] - ratios[a]);
+    renderDonut(
+      key,
+      [...ids, OTHER_GENRE.id].map((id) => ({ label: GENRE_LABELS[id], ratio: ratios[id], color: genreColor(id) })),
+      total,
+    );
+    const leader = ids[0];
+    el(`#${key}-caption`).textContent = leader
+      ? `${label}: 最多は「${GENRE_LABELS[leader]}」${percent(ratios[leader])}`
+      : label;
+  }
+};
+
+const renderLanguageChart = (repos: readonly Repo[]): void => {
   const stats = new Map<string, { ai: number; total: number }>();
   for (const repo of repos) {
     const key = repo.language ?? '（なし）';
@@ -183,43 +271,39 @@ const renderLanguageChart =(repos: readonly Repo[]): void => {
     'language',
     () =>
       new Chart(el<HTMLCanvasElement>('#language-chart'), {
-      type: 'bar',
-      data: {
-        labels: rows.map((r) => r.lang),
-        datasets: [{ label: 'AI 比率', data: rows.map((r) => r.ratio * 100), backgroundColor: seriesColor(0) }],
-      },
-      options: {
-        indexAxis: 'y',
-        maintainAspectRatio: false,
-        scales: { x: { min: 0, max: 100, ticks: { callback: (v) => `${v}%` } } },
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            callbacks: {
-              label: (ctx) => {
-                const r = rows[ctx.dataIndex];
-                return r ? `${percent(r.ratio)}（${r.ai} / ${r.total} 件）` : '';
+        type: 'bar',
+        data: {
+          labels: rows.map((r) => r.lang),
+          datasets: [{ label: 'AI 比率', data: rows.map((r) => r.ratio * 100), backgroundColor: seriesColor(0) }],
+        },
+        options: {
+          indexAxis: 'y',
+          maintainAspectRatio: false,
+          scales: { x: { min: 0, max: 100, ticks: { callback: (v) => `${v}%` } } },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => {
+                  const r = rows[ctx.dataIndex];
+                  return r ? `${percent(r.ratio)}（${r.ai} / ${r.total} 件）` : '';
+                },
               },
             },
           },
         },
-      },
-    }),
+      }),
   );
 };
 
 interface TableState {
   query: string;
-  category: CategoryId | typeof ALL_CATEGORIES;
+  genre: GenreId | typeof ALL;
+  category: CategoryId | typeof ALL;
   newOnly: boolean;
 }
 
-const renderRanking = (
-  snapshot: Snapshot,
-  index: IndexFile,
-  dayIndex: number,
-  state: TableState,
-): void => {
+const renderRanking = (snapshot: Snapshot, index: IndexFile, dayIndex: number, state: TableState): void => {
   const previous = index.days[dayIndex - 1];
   const query = state.query.trim().toLowerCase();
   const rows = snapshot.repos
@@ -227,6 +311,7 @@ const renderRanking = (
     .map((repo, i) => ({ repo, rank: i + 1, isNew: previous ? !previous.top.includes(repo.name) : false }))
     .filter(({ repo, isNew }) => {
       if (state.newOnly && !isNew) return false;
+      if (state.genre && repo.genre !== state.genre) return false;
       if (state.category && !repo.categories.includes(state.category)) return false;
       return !query || `${repo.name} ${repo.description}`.toLowerCase().includes(query);
     });
@@ -234,7 +319,10 @@ const renderRanking = (
   const gain = (v: number): string => (v > 0 ? number.format(v) : '—');
   el('#ranking').innerHTML = rows
     .map(({ repo, rank, isNew }) => {
-      const chips = repo.categories.map((id) => `<span class="chip">${escapeHtml(labelOf(id))}</span>`).join('');
+      const chips = [
+        `<span class="chip genre">${escapeHtml(GENRE_LABELS[repo.genre])}</span>`,
+        ...repo.categories.map((id) => `<span class="chip">${escapeHtml(categoryLabel(id))}</span>`),
+      ].join('');
       return `<tr>
         <td class="num">${rank}</td>
         <td class="repo">
@@ -242,7 +330,7 @@ const renderRanking = (
             isNew ? '<span class="badge-new">NEW</span>' : ''
           }
           <div class="desc">${escapeHtml(repo.description)}</div>
-          ${chips ? `<div class="chips">${chips}</div>` : ''}
+          <div class="chips">${chips}</div>
         </td>
         <td>${escapeHtml(repo.language ?? '—')}</td>
         <td class="num">${number.format(repo.stars)}</td>
@@ -256,6 +344,13 @@ const renderRanking = (
   el('#ranking-count').textContent = `${rows.length} 件を表示`;
 };
 
+const fillSelect = (select: HTMLSelectElement, allLabel: string, options: readonly [string, string][]): void => {
+  select.innerHTML = [
+    `<option value="${ALL}">${allLabel}</option>`,
+    ...options.map(([value, label]) => `<option value="${value}">${escapeHtml(label)}</option>`),
+  ].join('');
+};
+
 const main = async (): Promise<void> => {
   applyChartTheme();
   const index = await fetchJson<IndexFile>('./index.json');
@@ -267,16 +362,22 @@ const main = async (): Promise<void> => {
     .map((d) => `<option value="${d.date}">${d.date}</option>`)
     .join('');
 
+  const genreFilter = el<HTMLSelectElement>('#genre-filter');
   const categoryFilter = el<HTMLSelectElement>('#category-filter');
-  categoryFilter.innerHTML = [
-    `<option value="${ALL_CATEGORIES}">すべてのカテゴリ</option>`,
-    ...CATEGORIES.map((c) => `<option value="${c.id}">${escapeHtml(c.label)}</option>`),
-  ].join('');
-  el('#top-n').textContent = String(index.topN);
+  fillSelect(
+    genreFilter,
+    'すべてのジャンル',
+    GENRE_IDS.map((id) => [id, GENRE_LABELS[id]]),
+  );
+  fillSelect(
+    categoryFilter,
+    'すべてのカテゴリ',
+    CATEGORIES.map((c) => [c.id, c.label]),
+  );
+  document.querySelectorAll('.top-n').forEach((n) => (n.textContent = String(index.topN)));
   el('#footer').textContent = `最終更新: ${new Date(index.updatedAt).toLocaleString('ja-JP')}`;
 
-  let scope: Scope = 'top';
-  const table: TableState = { query: '', category: ALL_CATEGORIES, newOnly: false };
+  const table: TableState = { query: '', genre: ALL, category: ALL, newOnly: false };
   const snapshots = new Map<string, Snapshot>();
   let current: { snapshot: Snapshot; dayIndex: number } | null = null;
 
@@ -289,6 +390,7 @@ const main = async (): Promise<void> => {
     current = { snapshot, dayIndex };
     renderKpis(snapshot, day, index.days[dayIndex - 1]);
     renderAiDonuts(day);
+    renderGenreDonuts(day);
     renderCategoryChart(day);
     renderLanguageChart(snapshot.repos);
     renderRanking(snapshot, index, dayIndex, table);
@@ -303,24 +405,37 @@ const main = async (): Promise<void> => {
     table.query = (e.currentTarget as HTMLInputElement).value;
     rerenderTable();
   });
+  genreFilter.addEventListener('change', () => {
+    table.genre = GENRE_IDS.find((id) => id === genreFilter.value) ?? ALL;
+    rerenderTable();
+  });
   categoryFilter.addEventListener('change', () => {
-    const value = categoryFilter.value;
-    table.category = CATEGORY_IDS.find((id) => id === value) ?? ALL_CATEGORIES;
+    table.category = CATEGORY_IDS.find((id) => id === categoryFilter.value) ?? ALL;
     rerenderTable();
   });
   el<HTMLInputElement>('#new-only').addEventListener('change', (e) => {
     table.newOnly = (e.currentTarget as HTMLInputElement).checked;
     rerenderTable();
   });
-  document.querySelectorAll<HTMLButtonElement>('.segmented button').forEach((button) => {
-    button.addEventListener('click', () => {
-      scope = button.dataset.scope === 'all' ? 'all' : 'top';
-      document.querySelectorAll('.segmented button').forEach((b) => b.classList.toggle('active', b === button));
-      renderTrend(index, scope);
+
+  const trendRenderers: Record<string, (index: IndexFile, scope: Scope) => void> = {
+    trend: renderTrend,
+    'genre-trend': renderGenreTrend,
+  };
+  document.querySelectorAll<HTMLElement>('.segmented').forEach((group) => {
+    const render = trendRenderers[group.dataset.chart ?? ''];
+    if (!render) return;
+    const buttons = group.querySelectorAll<HTMLButtonElement>('button');
+    buttons.forEach((button) => {
+      button.addEventListener('click', () => {
+        buttons.forEach((b) => b.classList.toggle('active', b === button));
+        render(index, button.dataset.scope === 'all' ? 'all' : 'top');
+      });
     });
   });
 
-  renderTrend(index, scope);
+  renderTrend(index, 'top');
+  renderGenreTrend(index, 'top');
   await showDate(dateSelect.value);
 };
 
