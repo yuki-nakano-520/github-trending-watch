@@ -10,7 +10,7 @@ export const GENRES = [
     id: 'security',
     label: 'セキュリティ',
     pattern:
-      /secur|pentest|penetration|vulnerab|malware|reverse engineer|exploit|\bctf\b|osint|hacker|password|firewall|\bwaf\b|threat|fuzz|scanner|owasp|isolation|containment|identity/i,
+      /secur|pentest|penetration|vulnerab|malware|reverse engineer|exploit|\bctf\b|osint|hacker|password|firewall|\bwaf\b|threat|fuzz|scanner|owasp|isolation|containment|identity|metasploit/i,
   },
   {
     id: 'finance',
@@ -33,7 +33,7 @@ export const GENRES = [
     id: 'media',
     label: '動画 / 音声 / メディア',
     pattern:
-      /video|audio|voice|music|stream|iptv|anime|manga|comic|ebook|podcast|player|dubb|subtitle|youtube|spotify|jellyfin|kodi|movie|番剧|影视|漫画|直播|torrent|\bepg\b|photo|sprite|pixel art|screen ?record|speech|\btv\b|novel|小说/i,
+      /video|audio|voice|music|stream|iptv|anime|manga|comic|ebook|podcast|player|dubb|subtitle|youtube|spotify|jellyfin|kodi|movie|番剧|影视|漫画|直播|torrent|\bepg\b|photo|sprite|pixel art|screen ?record|speech|\btv\b|novel|小说|koreader|读书/i,
   },
   {
     id: 'network',
@@ -45,11 +45,13 @@ export const GENRES = [
     id: 'infra',
     label: 'インフラ / セルフホスト / DB',
     pattern:
-      /self-host|database|\bsql|postgres|sqlite|redis|kubernetes|docker|cloud|server|deploy|paas|serverless|storage|backup|monitoring|observability|search engine|home automation|proxmox|mail|replication|time-series|distributed|\berp\b|\bcrm\b|analytics|scheduling|e-?commerce|helpdesk|support desk|health records|asset management|it management|management platform|homelab|systemd|hardware monitor|bootable|\busb\b|panel|blog|建站|community|smart charging|subdomain/i,
+      /self-host|database|\bsql|postgres|sqlite|redis|kubernetes|docker|cloud|server|deploy|paas|serverless|storage|backup|monitoring|observability|search engine|home automation|proxmox|mail|replication|time-series|distributed|\berp\b|\bcrm\b|analytics|scheduling|e-?commerce|helpdesk|support desk|health records|asset management|it management|management platform|homelab|systemd|hardware monitor|bootable|\busb\b|panel|blog|建站|community|smart charging|subdomain|weather/i,
   },
   {
     id: 'devtool',
     label: '開発ツール',
+    // End-user apps that mention "CLI", "engine", "toolkit" etc. fall through to later genres.
+    exclude: /cleaner|\bpc clean|menu bar|grammar|translat|\bocr\b|\bcad\b|freecad|parametric modeler|operating system|streak/i,
     pattern:
       /\bcli\b|command[- ]line|terminal|editor|\bide\b|compiler|framework|library|\bsdk\b|\bapi\b|debug|\bbuild|lint|\btest|runtime|programming language|bundler|package manager|neovim|\bvim\b|\bgit\b|static site|typescript|javascript|python|\brust\b|\bgo\b|parser|components|design system|\bcss\b|react|plugin|shell|interpreter|theorem|language server|toolkit|code\b|developer|\bhash|engine|dependency|version manager|dependabot|\bnvim\b|\blsp|treesitter|functional language|dynamic language|spring|rails|jruby|composer|\bzig\b|svg|theme|readme/i,
   },
@@ -57,7 +59,7 @@ export const GENRES = [
     id: 'app',
     label: 'モバイル / デスクトップアプリ',
     pattern:
-      /android|\bios\b|ipad|macos|\bmac\b|windows|linux|desktop|mobile|menu bar|\bapp\b|tracker|\bnotes?\b|messenger|\bchat\b|calendar|launcher|keyboard|firmware|browser|client|reader|file manager|cleaner|front-?end for|scan|screenshot|viewer|拼音|input method|map generator|digital sign/i,
+      /android|\bios\b|ipad|macos|\bmac\b|windows|linux|desktop|mobile|menu bar|\bapp\b|tracker|\bnotes?\b|messenger|\bchat\b|calendar|launcher|keyboard|firmware|browser|client|reader|file manager|cleaner|front-?end for|scan|screenshot|viewer|拼音|input method|map generator|digital sign|grammar|translat|\bocr\b|\bcad\b|freecad|parametric modeler/i,
   },
 ] as const;
 
@@ -76,4 +78,6 @@ export const GENRE_LABELS = Object.fromEntries([
 const LANGUAGE_FALLBACK: Partial<Record<string, GenreId>> = { Kotlin: 'app', Swift: 'app', Dart: 'app' };
 
 export const genreOf = (text: string, language: string | null): GenreId =>
-  GENRES.find((g) => g.pattern.test(text))?.id ?? (language ? LANGUAGE_FALLBACK[language] : undefined) ?? OTHER_GENRE.id;
+  GENRES.find((g) => g.pattern.test(text) && !('exclude' in g && g.exclude.test(text)))?.id ??
+  (language ? LANGUAGE_FALLBACK[language] : undefined) ??
+  OTHER_GENRE.id;
