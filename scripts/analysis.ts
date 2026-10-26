@@ -1,14 +1,20 @@
 import { readFile, writeFile } from 'node:fs/promises';
+import { alternativeTargetsOf } from '../shared/alternatives.ts';
 import { CATEGORY_IDS, classify } from '../shared/categories.ts';
 import { GENRE_IDS, genreOf } from '../shared/genres.ts';
 import type { DaySummary, IndexFile, Repo } from '../shared/types.ts';
 import { INDEX_FILE } from './config.ts';
 
-export type UnclassifiedRepo = Omit<Repo, 'categories' | 'genre'>;
+export type UnclassifiedRepo = Omit<Repo, 'categories' | 'genre' | 'alternativeTo'>;
 
 export const classifyRepo = (repo: UnclassifiedRepo): Repo => {
   const text = `${repo.name} ${repo.description}`;
-  return { ...repo, categories: classify(text), genre: genreOf(text, repo.language) };
+  return {
+    ...repo,
+    categories: classify(text),
+    genre: genreOf(text, repo.language),
+    alternativeTo: alternativeTargetsOf(repo.description),
+  };
 };
 
 const ratioBy = <K extends string>(

@@ -344,7 +344,30 @@ const renderRanking = (snapshot: Snapshot, index: IndexFile, dayIndex: number, s
   el('#ranking-count').textContent = `${rows.length} 件を表示`;
 };
 
-const fillSelect = (select: HTMLSelectElement, allLabel: string, options: readonly [string, string][]): void => {
+const renderAlternatives = (snapshot: Snapshot, topN: number, topOnly: boolean): void => {
+  const rows = snapshot.repos
+    .map((repo, i) => ({ repo, rank: i + 1 }))
+    .filter(({ repo, rank }) => repo.alternativeTo.length > 0 && (!topOnly || rank <= topN));
+
+  el('#alternatives').innerHTML = rows
+    .map(({ repo, rank }) => {
+      const targets = repo.alternativeTo.map((t) => `<span class="chip target">${escapeHtml(t)}</span>`).join('');
+      return `<tr>
+        <td class="num">${rank}</td>
+        <td><div class="chips">${targets}</div></td>
+        <td class="repo">
+          <a href="https://github.com/${escapeHtml(repo.name)}" target="_blank" rel="noopener">${escapeHtml(repo.name)}</a>
+          <div class="desc">${escapeHtml(repo.description)}</div>
+        </td>
+        <td>${escapeHtml(GENRE_LABELS[repo.genre])}</td>
+        <td class="num">${number.format(repo.stars)}</td>
+      </tr>`;
+    })
+    .join('');
+  el('#alternatives-count').textContent = `${rows.length} 件`;
+};
+
+const fillSelect =(select: HTMLSelectElement, allLabel: string, options: readonly [string, string][]): void => {
   select.innerHTML = [
     `<option value="${ALL}">${allLabel}</option>`,
     ...options.map(([value, label]) => `<option value="${value}">${escapeHtml(label)}</option>`),
@@ -380,6 +403,7 @@ const main = async (): Promise<void> => {
   const table: TableState = { query: '', genre: ALL, category: ALL, newOnly: false };
   const snapshots = new Map<string, Snapshot>();
   let current: { snapshot: Snapshot; dayIndex: number } | null = null;
+  const altTopOnly = el<HTMLInputElement>('#alt-top-only');
 
   const showDate = async (date: string): Promise<void> => {
     const dayIndex = index.days.findIndex((d) => d.date === date);
@@ -393,6 +417,7 @@ const main = async (): Promise<void> => {
     renderGenreDonuts(day);
     renderCategoryChart(day);
     renderLanguageChart(snapshot.repos);
+    renderAlternatives(snapshot, index.topN, altTopOnly.checked);
     renderRanking(snapshot, index, dayIndex, table);
   };
 
@@ -412,6 +437,9 @@ const main = async (): Promise<void> => {
   categoryFilter.addEventListener('change', () => {
     table.category = CATEGORY_IDS.find((id) => id === categoryFilter.value) ?? ALL;
     rerenderTable();
+  });
+  altTopOnly.addEventListener('change', () => {
+    if (current) renderAlternatives(current.snapshot, index.topN, altTopOnly.checked);
   });
   el<HTMLInputElement>('#new-only').addEventListener('change', (e) => {
     table.newOnly = (e.currentTarget as HTMLInputElement).checked;

@@ -14,7 +14,7 @@ const main = async (): Promise<void> => {
   for (const file of files) {
     const url = new URL(file, SNAPSHOT_DIR);
     const snapshot = JSON.parse(await readFile(url, 'utf8')) as Snapshot;
-    const repos = snapshot.repos.map(({ categories: _c, genre: _g, ...rest }) => classifyRepo(rest));
+    const repos = snapshot.repos.map(({ categories: _c, genre: _g, alternativeTo: _a, ...rest }) => classifyRepo(rest));
     await writeFile(url, `${JSON.stringify({ ...snapshot, repos })}\n`);
     summaries.push(summarize(snapshot.date, repos, TOP_N));
   }

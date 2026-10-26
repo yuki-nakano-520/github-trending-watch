@@ -87,6 +87,32 @@
 
       <section class="card">
         <div class="card-head">
+          <h2>有名サービスの代替 OSS</h2>
+          <label class="check"><input id="alt-top-only" type="checkbox" /> 上位 <span class="top-n"></span> 件のみ</label>
+        </div>
+        <p class="muted small">
+          説明文の「alternative to X」「X replacement」「clone of X」などから、置き換え先を自動で抜き出しています。#
+          は全件中の順位です。
+        </p>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th class="num">#</th>
+                <th>置き換え先</th>
+                <th>リポジトリ</th>
+                <th>ジャンル</th>
+                <th class="num">★</th>
+              </tr>
+            </thead>
+            <tbody id="alternatives"></tbody>
+          </table>
+        </div>
+        <p class="muted small" id="alternatives-count"></p>
+      </section>
+
+      <section class="card">
+        <div class="card-head">
           <h2>ランキング</h2>
           <div class="filters">
             <input id="search" type="search" placeholder="名前・説明で検索" />

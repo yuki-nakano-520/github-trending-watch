@@ -19,6 +19,8 @@ export interface Repo {
   categories: CategoryId[];
   /** Exactly one genre per repo, unlike categories. */
   genre: GenreId;
+  /** Products the description says this repo replaces, e.g. ["Semrush", "Ahrefs"]. */
+  alternativeTo: string[];
   /** Monthly-equivalent star gain used for ranking. */
   score: number;
 }
