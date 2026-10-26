@@ -39,9 +39,10 @@ const applyChartTheme = (): void => {
 };
 
 const charts = new Map<string, Chart>();
-const replaceChart = (key: string, chart: Chart): void => {
+/** Destroys the previous chart before creating the next one; Chart.js rejects two charts on one canvas. */
+const replaceChart = (key: string, create: () => Chart): void => {
   charts.get(key)?.destroy();
-  charts.set(key, chart);
+  charts.set(key, create());
 };
 
 /** Consecutive days, ending at `dayIndex`, on which `name` was in the top list. */
@@ -55,7 +56,8 @@ const renderTrend = (index: IndexFile, scope: Scope): void => {
   const canvas = el<HTMLCanvasElement>('#trend-chart');
   replaceChart(
     'trend',
-    new Chart(canvas, {
+    () =>
+      new Chart(canvas, {
       type: 'line',
       data: {
         labels: index.days.map((d) => d.date),
@@ -72,7 +74,7 @@ const renderTrend = (index: IndexFile, scope: Scope): void => {
       options: {
         maintainAspectRatio: false,
         interaction: { mode: 'index', intersect: false },
-        scales: { y: { min: 0, ticks: { callback: (v) => `${v}%` } } },
+        scales: { y: { min: 0, grace: '10%', ticks: { callback: (v) => `${v}%` } } },
         plugins: {
           tooltip: { callbacks: { label: (ctx) => `${ctx.dataset.label}: ${Number(ctx.parsed.y).toFixed(1)}%` } },
         },
@@ -98,7 +100,8 @@ const renderKpis = (snapshot: Snapshot, day: DaySummary, previous: DaySummary | 
 const renderCategoryChart = (day: DaySummary): void => {
   replaceChart(
     'category',
-    new Chart(el<HTMLCanvasElement>('#category-chart'), {
+    () =>
+      new Chart(el<HTMLCanvasElement>('#category-chart'), {
       type: 'bar',
       data: {
         labels: CATEGORY_IDS.map(labelOf),
@@ -141,7 +144,8 @@ const renderLanguageChart = (repos: readonly Repo[]): void => {
 
   replaceChart(
     'language',
-    new Chart(el<HTMLCanvasElement>('#language-chart'), {
+    () =>
+      new Chart(el<HTMLCanvasElement>('#language-chart'), {
       type: 'bar',
       data: {
         labels: rows.map((r) => r.lang),
