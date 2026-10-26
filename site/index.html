@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>GitHub Trending Watch</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <header class="page-header">
+      <div>
+        <h1>GitHub Trending Watch</h1>
+        <p class="muted">GitHub Trending（今日・今週・今月 × 全体＋主要言語）を毎日収集して傾向を追跡します。</p>
+      </div>
+      <label class="field">
+        <span>日付</span>
+        <select id="date-select"></select>
+      </label>
+    </header>
+
+    <main>
+      <section class="kpis" id="kpis"></section>
+
+      <section class="card">
+        <div class="card-head">
+          <h2>カテゴリ比率の推移</h2>
+          <div class="segmented" role="group" aria-label="対象">
+            <button type="button" data-scope="top" class="active">上位 <span id="top-n"></span> 件</button>
+            <button type="button" data-scope="all">全件</button>
+          </div>
+        </div>
+        <p class="muted small">凡例をクリックすると系列の表示を切り替えられます。</p>
+        <div class="chart-box"><canvas id="trend-chart"></canvas></div>
+      </section>
+
+      <div class="grid-2">
+        <section class="card">
+          <h2>カテゴリ比率（選択日）</h2>
+          <div class="chart-box tall"><canvas id="category-chart"></canvas></div>
+        </section>
+        <section class="card">
+          <h2>言語別の AI 比率（選択日）</h2>
+          <p class="muted small">言語ページごとにほぼ同数を収集しているため、件数の多寡は人気を表しません。</p>
+          <div class="chart-box tall"><canvas id="language-chart"></canvas></div>
+        </section>
+      </div>
+
+      <section class="card">
+        <div class="card-head">
+          <h2>ランキング</h2>
+          <div class="filters">
+            <input id="search" type="search" placeholder="名前・説明で検索" />
+            <select id="category-filter"></select>
+            <label class="check"><input id="new-only" type="checkbox" /> 新顔のみ</label>
+          </div>
+        </div>
+        <p class="muted small">
+          スコア＝今月の獲得スター（無ければ 今週×4、今日×20）。連続＝上位入りが続いている日数。NEW＝前回の上位に無かったもの。
+        </p>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>リポジトリ</th>
+                <th>言語</th>
+                <th class="num">★</th>
+                <th class="num">今日</th>
+                <th class="num">今週</th>
+                <th class="num">今月</th>
+                <th class="num">連続</th>
+              </tr>
+            </thead>
+            <tbody id="ranking"></tbody>
+          </table>
+        </div>
+        <p class="muted small" id="ranking-count"></p>
+      </section>
+    </main>
+
+    <footer class="muted small" id="footer"></footer>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>
