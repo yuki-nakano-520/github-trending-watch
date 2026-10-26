@@ -128,7 +128,44 @@ const renderCategoryChart = (day: DaySummary): void => {
   );
 };
 
-const renderLanguageChart = (repos: readonly Repo[]): void => {
+const renderAiDonuts = (day: DaySummary): void => {
+  const targets = [
+    { key: 'ai-top', label: `上位 ${day.top.length} 件`, ratio: day.categoryRatio.top.ai, total: day.top.length },
+    { key: 'ai-all', label: '全件', ratio: day.categoryRatio.all.ai, total: day.repoCount },
+  ];
+  for (const { key, label, ratio, total } of targets) {
+    replaceChart(
+      key,
+      () =>
+        new Chart(el<HTMLCanvasElement>(`#${key}-chart`), {
+          type: 'doughnut',
+          data: {
+            labels: ['AI', '非AI'],
+            datasets: [
+              {
+                data: [ratio * 100, (1 - ratio) * 100],
+                backgroundColor: [seriesColor(0), seriesColor(7)],
+                borderColor: cssVar('--surface'),
+                borderWidth: 2,
+              },
+            ],
+          },
+          options: {
+            maintainAspectRatio: false,
+            cutout: '60%',
+            plugins: {
+              legend: { position: 'bottom' },
+              tooltip: { callbacks: { label: (ctx) => `${ctx.label}: ${Number(ctx.parsed).toFixed(1)}%` } },
+            },
+          },
+        }),
+    );
+    el(`#${key}-caption`).textContent =
+      `${label}: AI ${number.format(Math.round(ratio * total))} / ${number.format(total)} 件（${percent(ratio)}）`;
+  }
+};
+
+const renderLanguageChart =(repos: readonly Repo[]): void => {
   const stats = new Map<string, { ai: number; total: number }>();
   for (const repo of repos) {
     const key = repo.language ?? '（なし）';
@@ -251,6 +288,7 @@ const main = async (): Promise<void> => {
     snapshots.set(date, snapshot);
     current = { snapshot, dayIndex };
     renderKpis(snapshot, day, index.days[dayIndex - 1]);
+    renderAiDonuts(day);
     renderCategoryChart(day);
     renderLanguageChart(snapshot.repos);
     renderRanking(snapshot, index, dayIndex, table);
